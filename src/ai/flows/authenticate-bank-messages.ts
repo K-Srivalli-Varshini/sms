@@ -28,24 +28,25 @@ export type AuthenticateBankMessageOutput = z.infer<
   typeof AuthenticateBankMessageOutputSchema
 >;
 
+// A list of known, authenticated bank senders.
+// In a real application, this would be a database or a more robust service.
+const AUTHENTICATED_BANKS = ['BANK-SBI', 'HDFCBANK', 'ICICI-BANK', 'AxisBank'];
+
+
 const isAuthenticatedBank = ai.defineTool(
   {
     name: 'isAuthenticatedBank',
-    description: 'Checks if the sender is an authenticated bank.',
+    description: 'Checks if the sender is an authenticated bank based on a known list.',
     inputSchema: z.object({
       sender: z.string().describe('The sender of the message.'),
     }),
     outputSchema: z.boolean(),
   },
   async input => {
-    // Here, you would implement the logic to check if the sender is an
-    // authenticated bank. This could involve querying a database of known
-    // authenticated banks, or using some other method to verify the sender.
-    // For this example, we'll just return `true` to simulate a successful
-    // authentication.
-    // TODO: Implement the actual bank authentication logic here.
-    console.log(`Checking if ${input.sender} is an authenticated bank.`);
-    return true;
+    // Check if the sender is in our list of authenticated banks.
+    const isAuth = AUTHENTICATED_BANKS.includes(input.sender.toUpperCase());
+    console.log(`Checking if ${input.sender} is an authenticated bank: ${isAuth}`);
+    return isAuth;
   }
 );
 
@@ -54,7 +55,7 @@ const authenticateBankMessagePrompt = ai.definePrompt({
   tools: [isAuthenticatedBank],
   input: {schema: AuthenticateBankMessageInputSchema},
   output: {schema: AuthenticateBankMessageOutputSchema},
-  prompt: `Determine if the following message from {{sender}} is from an authenticated bank. Use the isAuthenticatedBank tool to check.
+  prompt: `If the sender '{{sender}}' is an authenticated bank, classify the message as Ham. Use the isAuthenticatedBank tool to verify the sender.
 
 Message Text: {{messageText}}`,
 });
@@ -66,8 +67,16 @@ const authenticateBankMessageFlow = ai.defineFlow(
     outputSchema: AuthenticateBankMessageOutputSchema,
   },
   async input => {
-    const {output} = await authenticateBankMessagePrompt(input);
-    return output!;
+    // We only need to run this check if the sender might be a bank.
+    // Let's check against our list first before calling the AI.
+    if (AUTHENTICATED_BANKS.some(bank => input.sender.toUpperCase().includes(bank))) {
+        const result = await isAuthenticatedBank(input);
+        return { isHam: result };
+    }
+    
+    // If the sender is not in the list, no need to call the AI with the tool.
+    // It's not a bank message we can authenticate this way.
+    return { isHam: false };
   }
 );
 
@@ -76,4 +85,3 @@ export async function authenticateBankMessage(
 ): Promise<AuthenticateBankMessageOutput> {
   return authenticateBankMessageFlow(input);
 }
-
