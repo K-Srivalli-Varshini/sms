@@ -16,14 +16,24 @@ type ClassificationResult = {
   confidence: number;
 };
 
+// Define weights for each rule
+const weights = {
+  isKnownContact: 50,
+  isUnknownContact: 10,
+  containsMixedCharacters: 30,
+  containsLink: 20,
+  containsMoneyTerms: 20,
+  containsPremiumRateNumber: 40,
+  containsUrgency: 20,
+  containsSpamKeywords: 25,
+};
+
+const SPAM_THRESHOLD = 50;
+
 export async function classifyMessage(
   sender: string,
   message: string
 ): Promise<ClassificationResult> {
-  const reasons: string[] = [];
-  let hamScore = 0;
-  let spamScore = 0;
-
   // Rule 1: OTP Messages from Known Senders → Classified as Ham.
   const otpResult = await identifyOTP({ sender, message });
   if (otpResult.isOTP) {
@@ -43,73 +53,77 @@ export async function classifyMessage(
       confidence: 100,
     };
   }
-  
+
+  const reasons: string[] = [];
+  let score = 0;
+  const triggeredRules: (keyof typeof weights)[] = [];
+
   // Rule: Check if sender is a known contact.
   const knownContactResult = await isKnownContact({ sender });
   if (knownContactResult.isKnown) {
     reasons.push('Sender is a known contact.');
-    hamScore += 40;
+    score -= weights.isKnownContact; // Negative score for ham indicator
   } else {
     reasons.push('Sender is unknown.');
-    spamScore += 10;
+    score += weights.isUnknownContact;
+    triggeredRules.push('isUnknownContact');
   }
 
   // Spam checks
   const mixedCharsResult = await detectMixedCharacters({ message });
   if (mixedCharsResult.containsMixedCharacters) {
     reasons.push('Contains words with mixed letters and numbers (leetspeak).');
-    spamScore += 30;
+    score += weights.containsMixedCharacters;
+    triggeredRules.push('containsMixedCharacters');
   }
 
   const linksResult = await detectLinks({ message });
   if (linksResult.containsLink) {
     reasons.push('Contains a URL/link.');
-    spamScore += 20;
+    score += weights.containsLink;
+    triggeredRules.push('containsLink');
   }
   
   const moneyTermsResult = await detectMoneyRelatedTerms({ message });
   if (moneyTermsResult.containsMoneyTerms) {
     reasons.push('Contains money-related terms.');
-    spamScore += 20;
+    score += weights.containsMoneyTerms;
+    triggeredRules.push('containsMoneyTerms');
   }
   
   const premiumNumberResult = await detectPremiumRateNumbers({ message });
   if (premiumNumberResult.containsPremiumRateNumber) {
     reasons.push('Contains a premium-rate number.');
-    spamScore += 40;
+    score += weights.containsPremiumRateNumber;
+    triggeredRules.push('containsPremiumRateNumber');
   }
   
   const urgencyResult = await detectUrgency({ message });
   if (urgencyResult.containsUrgency) {
     reasons.push('Contains urgent language.');
-    spamScore += 20;
+    score += weights.containsUrgency;
+    triggeredRules.push('containsUrgency');
   }
 
   const keywordResult = await analyzeKeywords({ message });
   if (keywordResult.isSpam) {
     reasons.push(keywordResult.reason || 'Contains spam-related keywords.');
-    spamScore += 25;
+    score += weights.containsSpamKeywords;
+    triggeredRules.push('containsSpamKeywords');
   }
 
-  const totalScore = hamScore + spamScore;
-  if (totalScore === 0) {
-    // Default case if no specific rules match
-    return {
-      classification: 'Ham',
-      reason: 'Does not meet any specific spam criteria.',
-      confidence: 95,
-    };
-  }
-
-  if (spamScore > hamScore) {
-    const confidence = Math.min(99, Math.round((spamScore / totalScore) * 100) + 20);
+  const totalPossibleSpamScore = Object.values(weights).reduce((sum, weight) => sum + weight, 0) - weights.isKnownContact;
+  
+  if (score >= SPAM_THRESHOLD) {
+    const confidence = 50 + Math.min(50, Math.round((score / totalPossibleSpamScore) * 100));
     return {
       classification: 'Spam',
       reason: reasons.join(' '),
       confidence: Math.min(99, confidence),
     };
   } else {
-    const confidence = Math.min(99, Math.round((hamScore / totalScore) * 100) + 20);
+    // Inverse confidence for ham
+    const confidence = 50 + Math.min(50, Math.round(((SPAM_THRESHOLD - score) / SPAM_THRESHOLD) * 50));
     return {
       classification: 'Ham',
       reason: reasons.join(' ') || 'Does not meet spam criteria.',
