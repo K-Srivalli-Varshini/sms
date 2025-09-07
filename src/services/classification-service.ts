@@ -69,48 +69,45 @@ export async function classifyMessage(
     triggeredRules.push('isUnknownContact');
   }
 
-  // Spam checks
-  const mixedCharsResult = await detectMixedCharacters({ message });
-  if (mixedCharsResult.containsMixedCharacters) {
+  // Spam checks - combined into one flow
+  const { output: contentAnalysis } = await classifyContent({ message });
+
+  if (contentAnalysis.containsMixedCharacters) {
     reasons.push('Contains words with mixed letters and numbers (leetspeak).');
     score += weights.containsMixedCharacters;
     triggeredRules.push('containsMixedCharacters');
   }
 
-  const linksResult = await detectLinks({ message });
-  if (linksResult.containsLink) {
+  if (contentAnalysis.containsLink) {
     reasons.push('Contains a URL/link.');
     score += weights.containsLink;
     triggeredRules.push('containsLink');
   }
   
-  const moneyTermsResult = await detectMoneyRelatedTerms({ message });
-  if (moneyTermsResult.containsMoneyTerms) {
+  if (contentAnalysis.containsMoneyTerms) {
     reasons.push('Contains money-related terms.');
     score += weights.containsMoneyTerms;
     triggeredRules.push('containsMoneyTerms');
   }
   
-  const premiumNumberResult = await detectPremiumRateNumbers({ message });
-  if (premiumNumberResult.containsPremiumRateNumber) {
+  if (contentAnalysis.containsPremiumRateNumber) {
     reasons.push('Contains a premium-rate number.');
     score += weights.containsPremiumRateNumber;
     triggeredRules.push('containsPremiumRateNumber');
   }
   
-  const urgencyResult = await detectUrgency({ message });
-  if (urgencyResult.containsUrgency) {
+  if (contentAnalysis.containsUrgency) {
     reasons.push('Contains urgent language.');
     score += weights.containsUrgency;
     triggeredRules.push('containsUrgency');
   }
 
-  const keywordResult = await analyzeKeywords({ message });
-  if (keywordResult.isSpam) {
-    reasons.push(keywordResult.reason || 'Contains spam-related keywords.');
+  if (contentAnalysis.containsSpamKeywords) {
+    reasons.push('Contains spam-related keywords.');
     score += weights.containsSpamKeywords;
     triggeredRules.push('containsSpamKeywords');
   }
+
 
   const totalPossibleSpamScore = Object.values(weights).reduce((sum, weight) => sum + weight, 0) - weights.isKnownContact;
   
@@ -131,3 +128,41 @@ export async function classifyMessage(
     };
   }
 }
+
+// THIS IS A NEW FUNCTION and it needs to be exported from a new file.
+// I will create a new file src/ai/flows/classify-content.ts and add this function there.
+
+import {ai} from '@/ai/genkit';
+import {z} from 'genkit';
+
+const ClassifyContentInputSchema = z.object({
+  message: z.string().describe('The SMS/email message to analyze.'),
+});
+
+const ClassifyContentOutputSchema = z.object({
+    containsMixedCharacters: z.boolean().describe('Does the message contain words with mixed letters and numbers (e.g., congratulat1ons, fr33, cl1ck)?'),
+    containsLink: z.boolean().describe('Does the message contain a URL or link?'),
+    containsMoneyTerms: z.boolean().describe('Does the message contain any terms related to money, winning prizes, or financial transactions (e.g., "cash", "prize", "won", "payment", "invoice")?'),
+    containsPremiumRateNumber: z.boolean().describe("Does the message contain any premium-rate numbers (e.g., numbers starting with '900', '976', or short codes that require payment)?"),
+    containsUrgency: z.boolean().describe('Does the message contain urgent or time-sensitive language (e.g., "act now", "limited time", "urgent", "immediate action required")?'),
+    containsSpamKeywords: z.boolean().describe("Does the message contain any of the following keywords: 'free', 'lottery', 'win', 'buy now', 'click here'?"),
+});
+
+const classifyContentPrompt = ai.definePrompt({
+    name: 'classifyContentPrompt',
+    input: {schema: ClassifyContentInputSchema},
+    output: {schema: ClassifyContentOutputSchema},
+    prompt: `You are an expert spam detector. Your job is to analyze the input message and evaluate it against several criteria.
+
+Message: {{{message}}}
+
+Please evaluate the message and respond with a JSON object indicating whether the following are true or false.`,
+});
+
+const classifyContent = ai.defineFlow({
+    name: 'classifyContentFlow',
+    inputSchema: ClassifyContentInputSchema,
+    outputSchema: ClassifyContentOutputSchema,
+}, async (input) => {
+    return (await classifyContentPrompt(input)).output!;
+});

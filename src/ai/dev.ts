@@ -10,3 +10,4 @@ import '@/ai/flows/detect-money-related-terms.ts';
 import '@/ai/flows/detect-premium-rate-numbers.ts';
 import '@/ai/flows/detect-urgency.ts';
 import '@/ai/flows/is-known-contact.ts';
+import '@/ai/flows/classify-content.ts';

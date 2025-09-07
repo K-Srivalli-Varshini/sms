@@ -26,35 +26,6 @@ const IsKnownContactOutputSchema = z.object({
 export type IsKnownContactOutput = z.infer<typeof IsKnownContactOutputSchema>;
 
 export async function isKnownContact(input: IsKnownContactInput): Promise<IsKnownContactOutput> {
-  return isKnownContactFlow(input);
+  const isKnown = KNOWN_CONTACTS.includes(input.sender.toLowerCase());
+  return { isKnown };
 }
-
-const isKnownContactTool = ai.defineTool({
-    name: 'isKnownContactTool',
-    description: 'Checks if a sender is in the list of known contacts.',
-    inputSchema: IsKnownContactInputSchema,
-    outputSchema: IsKnownContactOutputSchema,
-}, async ({ sender }) => {
-    return { isKnown: KNOWN_CONTACTS.includes(sender.toLowerCase()) };
-});
-
-
-const prompt = ai.definePrompt({
-  name: 'isKnownContactPrompt',
-  tools: [isKnownContactTool],
-  input: {schema: IsKnownContactInputSchema},
-  output: {schema: IsKnownContactOutputSchema},
-  prompt: `Check if the sender '{{sender}}' is a known contact using the provided tool.`,
-});
-
-const isKnownContactFlow = ai.defineFlow(
-  {
-    name: 'isKnownContactFlow',
-    inputSchema: IsKnownContactInputSchema,
-    outputSchema: IsKnownContactOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
