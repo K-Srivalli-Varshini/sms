@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { ArrowRightLeft, Loader2, MailCheck, ShieldAlert, ShieldCheck } from 'lucide-react';
 
-import { classifyMessage } from './actions';
+import { classifyMessage } from '../services/classification-service';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -140,20 +140,20 @@ export default function JunkYardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <MessageFolder
             title="Ham"
-            icon={<MailCheck className="h-6 w-6 text-green-700" />}
+            icon={<MailCheck className="h-6 w-6 text-green-500" />}
             messages={hamMessages}
             onMoveMessage={(id) => handleMoveMessage(id, 'ham')}
             emptyText="Ham messages will appear here."
-            className="border-green-500/50 bg-green-500/5"
+            className="border-green-500/30 bg-green-500/10"
             targetFolder="Spam"
           />
           <MessageFolder
             title="Spam"
-            icon={<ShieldAlert className="h-6 w-6 text-red-700" />}
+            icon={<ShieldAlert className="h-6 w-6 text-red-500" />}
             messages={spamMessages}
             onMoveMessage={(id) => handleMoveMessage(id, 'spam')}
             emptyText="Spam messages will appear here."
-            className="border-destructive/50 bg-destructive/5"
+            className="border-red-500/30 bg-red-500/10"
             targetFolder="Ham"
           />
         </div>
@@ -203,10 +203,10 @@ interface MessageCardProps {
 function MessageCard({ message, onMove, targetFolder }: MessageCardProps) {
   const confidenceColor =
     message.confidence > 80
-      ? 'bg-green-100 text-green-800'
+      ? 'bg-green-700/20 text-green-300'
       : message.confidence > 60
-      ? 'bg-yellow-100 text-yellow-800'
-      : 'bg-red-100 text-red-800';
+      ? 'bg-yellow-700/20 text-yellow-300'
+      : 'bg-red-700/20 text-red-300';
   
   return (
     <Card className="p-4 relative group bg-card/80 backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg">
@@ -224,7 +224,7 @@ function MessageCard({ message, onMove, targetFolder }: MessageCardProps) {
           <p className="text-sm font-semibold text-foreground truncate">
             <span className="font-normal text-muted-foreground">From:</span> {message.sender}
           </p>
-          <Badge variant="outline" className={cn('ml-2', confidenceColor)}>
+          <Badge variant="outline" className={cn('ml-2 border-none', confidenceColor)}>
             {message.confidence}%
           </Badge>
         </div>
