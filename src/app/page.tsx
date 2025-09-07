@@ -11,12 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 type Message = {
   id: string;
   sender: string;
   content: string;
   reason: string;
+  confidence: number;
 };
 
 export default function JunkYardPage() {
@@ -46,6 +48,7 @@ export default function JunkYardPage() {
         sender,
         content,
         reason: result.reason,
+        confidence: result.confidence,
       };
 
       if (result.classification === 'Ham') {
@@ -104,7 +107,7 @@ export default function JunkYardPage() {
               <Label htmlFor="sender">Sender</Label>
               <Input
                 id="sender"
-                placeholder="e.g., 'BANK-SBI' or '+1234567890'"
+                placeholder="e.g., 'mom' or '+1234567890' or 'BANK-SBI'"
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
                 disabled={isPending}
@@ -198,6 +201,13 @@ interface MessageCardProps {
 }
 
 function MessageCard({ message, onMove, targetFolder }: MessageCardProps) {
+  const confidenceColor =
+    message.confidence > 80
+      ? 'bg-green-100 text-green-800'
+      : message.confidence > 60
+      ? 'bg-yellow-100 text-yellow-800'
+      : 'bg-red-100 text-red-800';
+  
   return (
     <Card className="p-4 relative group bg-card/80 backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg">
        <Button
@@ -210,9 +220,14 @@ function MessageCard({ message, onMove, targetFolder }: MessageCardProps) {
         <ArrowRightLeft className="h-4 w-4" />
       </Button>
       <div className="pr-8">
-        <p className="text-sm font-semibold text-foreground truncate">
-          <span className="font-normal text-muted-foreground">From:</span> {message.sender}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-foreground truncate">
+            <span className="font-normal text-muted-foreground">From:</span> {message.sender}
+          </p>
+          <Badge variant="outline" className={cn('ml-2', confidenceColor)}>
+            {message.confidence}%
+          </Badge>
+        </div>
         <p className="mt-2 text-sm text-foreground/90">{message.content}</p>
         <p className="mt-3 text-xs text-muted-foreground/80 italic">
           Reason: {message.reason}
